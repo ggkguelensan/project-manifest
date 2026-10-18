@@ -26,6 +26,7 @@ test('select registered task worktree and nested target from current source', ()
   const plan = planTask(save(), root, task);
   assert.equal(plan.target_root, resolve(root, 'worktrees/task/apps/web'));
   assert.equal(plan.branch, 'task/example'); assert.equal(plan.local_changes, false);
+  assert.equal(plan.graphify.installation.status, 'not-inspected');
   writeFileSync(resolve(plan.target_root, 'app.txt'), 'modified');
   assert.equal(planTask(save(), root, task).local_changes, true);
 }));
@@ -52,12 +53,28 @@ test('target must exist in chosen branch, not only in main clone', () => fixture
   rmSync(resolve(root, 'worktrees/task/apps/web'), {recursive: true});
   assert.throws(() => planTask(save(), root, task));
 }));
+test('release-family branches cannot serve as task branches for any purpose', () => fixture((root, data, save, git) => {
+  git('branch', 'release-1.0.0');
+  git('branch', '-m', 'task/example', 'release-2.0.0');
+  assert.throws(() => planTask(save(), root, task), /Task branch must differ/);
+  assert.throws(() => planTask(save(), root, {...task, purpose:'release', release:'release-1.0.0'}), /Task branch must differ/);
+  data.repositories[0].release = {kind:'date'};
+  git('branch', '-m', 'release-2.0.0', 'release-2026-10-18');
+  assert.throws(() => planTask(save(), root, task), /Task branch must differ/);
+  git('branch', '-m', 'release-2026-10-18', 'task/release-2026-10-18-fix');
+  assert.equal(planTask(save(), root, task).branch, 'task/release-2026-10-18-fix');
+}));
 test('foreign clone with same content is not a registered worktree', () => fixture((root, data, save) => {
   execFileSync('git', ['clone', resolve(root, 'repositories/frontend'), resolve(root, 'foreign')], {stdio: 'pipe'});
   assert.throws(() => planTask(save(), root, {...task, worktree: 'foreign'}), /another repository/);
 }));
 test('graphify enabled needs project procedure, required wt cannot be disabled', () => fixture((root, data, save) => {
   data.tools.graphify.enabled = true; assert.throws(save, /procedure/);
+  writeFileSync(resolve(root, 'graph-procedure.md'), 'Inspect current worktree sources before querying graph.');
+  data.tools.graphify.procedure = 'graph-procedure.md';
+  const selected = planTask(save(), root, task);
+  assert.equal(selected.graphify.graph.status, 'not-located');
+  assert.equal(selected.graphify.freshness.status, 'unknown');
   data.tools.graphify.enabled = false; data.tools.worktrunk.required_for_tasks = true; assert.throws(save, /Worktrunk/);
 }));
 test('manifest must match its pinned commit and have no local changes', () => fixture((root, data, save, git) => {
@@ -65,4 +82,28 @@ test('manifest must match its pinned commit and have no local changes', () => fi
   assert.throws(save, /revision mismatch/);
   data.manifests[0].revision = git('rev-parse', 'HEAD'); assert.ok(save());
   writeFileSync(resolve(root, 'repositories/frontend/apps/web/app.txt'), 'modified'); assert.throws(save, /local changes/);
+}));
+
+test('target introduced only in task worktree does not depend on main checkout layout', () => fixture((root, data, save) => {
+  const created = resolve(root, 'worktrees/task/apps/new-app');
+  mkdirSync(created, {recursive: true}); writeFileSync(resolve(created, 'app.txt'), 'new application');
+  data.targets.push({id: 'new-app', repository_id: 'frontend', path: 'apps/new-app', manifests: []});
+  // Another registered target may also be absent from this branch.
+  data.targets.push({id: 'future', repository_id: 'frontend', path: 'apps/future', manifests: []});
+  const project = save();
+  assert.equal(planTask(project, root, {...task, target: 'new-app'}).target_root, created);
+  assert.equal(planTask(project, root, task).target_id, 'web');
+  assert.throws(() => planTask(project, root, {...task, target: 'future'}), /ENOENT/);
+}));
+test('deferred target resolution still rejects traversal, symlink escape and nested repositories', () => fixture((root, data, save) => {
+  for (const path of ['../reference', '/tmp', 'apps/../web', 'apps\\web']) {
+    data.targets[0].path = path; assert.throws(save, /relative path|schema/);
+  }
+  data.targets[0].path = 'apps/escape';
+  symlinkSync(resolve(root, 'reference'), resolve(root, 'worktrees/task/apps/escape'));
+  assert.throws(() => planTask(save(), root, task), /escapes/);
+  const nested = resolve(root, 'worktrees/task/apps/nested'); mkdirSync(nested);
+  execFileSync('git', ['init', '-q', nested], {stdio: 'pipe'});
+  data.targets[0].path = 'apps/nested';
+  assert.throws(() => planTask(save(), root, task), /unavailable in selected worktree/);
 }));

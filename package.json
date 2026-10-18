@@ -10,7 +10,17 @@
     "check": "node scripts/check.ts",
     "test": "node --test tests/*.test.ts",
     "inspect": "node scripts/project.ts",
-    "test:native": "node tests/native-discovery.ts"
+    "test:native": "node tests/native-discovery.ts",
+    "workdir": "node scripts/workdir.ts",
+    "inspect:graph": "node scripts/graph.ts",
+    "validate:connections": "node scripts/connections.ts",
+    "test:connections": "node tests/connections-integration.ts",
+    "test:pi-context": "node tests/pi-context.ts",
+    "test:worktrunk": "node tests/worktrunk-integration.ts",
+    "test:pi-cli-context": "node tests/pi-cli-context.ts",
+    "test:claude-discovery": "node tests/claude-discovery.ts",
+    "test:codex-selection": "node tests/codex-selection.ts",
+    "test:opencode-permissions": "node tests/opencode-permissions.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

@@ -1,3 +1,4 @@
+import { inspectGraph } from './graph.ts';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -11,8 +12,11 @@ const validate = new Ajv2020({allErrors: true, strict: true}).compile(schema);
 function requireThat(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 function unique(values: string[], label: string) { requireThat(new Set(values).size === values.length, `Duplicate ${label}`); }
 function within(root: string, path: string) { const rel = relative(root, path); return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); }
-export function localPath(root: string, path: string) {
+function validateRelativePath(path: string) {
   requireThat(!isAbsolute(path) && !path.includes('\\') && !path.includes(':') && !path.split('/').includes('..'), `Invalid relative path: ${path}`);
+}
+export function localPath(root: string, path: string) {
+  validateRelativePath(path);
   const result = realpathSync(resolve(root, path));
   requireThat(within(realpathSync(root), result), `Path escapes selected root: ${path}`);
   return result;
@@ -20,6 +24,12 @@ export function localPath(root: string, path: string) {
 function git(root: string, ...args: string[]) { return execFileSync('git', ['--no-optional-locks', '-C', root, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim(); }
 function gitRoot(root: string) { return realpathSync(git(root, 'rev-parse', '--show-toplevel')); }
 function commonGit(root: string) { return realpathSync(git(root, 'rev-parse', '--path-format=absolute', '--git-common-dir')); }
+function isReleaseBranch(branch: string, policy: Repository['release']) {
+  if (policy.kind === 'fixed') return branch === policy.name;
+  if (policy.kind === 'semver') return /^release-(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(branch);
+  const date = branch.replace(/^release-/, '');
+  return /^release-\d{4}-\d{2}-\d{2}$/.test(branch) && !Number.isNaN(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+}
 export function readProject(file: string, projectRoot: string): Project {
   const project: Project = JSON.parse(readFileSync(file, 'utf8'));
   requireThat(validate(project), `Project schema: ${JSON.stringify(validate.errors)}`);
@@ -39,9 +49,9 @@ export function readProject(file: string, projectRoot: string): Project {
   for (const target of project.targets) {
     const repository = project.repositories.find(repo => repo.id === target.repository_id);
     requireThat(repository, `Unknown repository: ${target.repository_id}`);
-    const repoRoot = localPath(projectRoot, repository.path);
-    const targetPath = localPath(repoRoot, target.path);
-    requireThat(statSync(targetPath).isDirectory() && gitRoot(targetPath) === repoRoot, `Target crosses repository boundary: ${target.id}`);
+    // Target existence and physical boundaries belong to the selected worktree.
+    // A task may introduce an application absent from the primary checkout.
+    validateRelativePath(target.path);
     for (const id of target.manifests) requireThat(project.manifests.some(m => m.id === id), `Unknown manifest: ${id}`);
   }
   for (const manifest of project.manifests) {
@@ -78,14 +88,10 @@ export function planTask(project: Project, projectRoot: string, options: { targe
     else {
       requireThat(options.release, 'Select a concrete release branch; a family is not an active release');
       base = options.release;
-      if (repo.release.kind === 'semver') requireThat(/^release-(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(base), 'Expected release-<semver> (three numeric components)');
-      else {
-        const value = base.replace(/^release-/, '');
-        requireThat(/^release-\d{4}-\d{2}-\d{2}$/.test(base) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, 'Expected valid release-YYYY-MM-DD');
-      }
+      requireThat(isReleaseBranch(base, repo.release), repo.release.kind === 'semver' ? 'Expected release-<semver> (three numeric components)' : 'Expected valid release-YYYY-MM-DD');
     }
   }
-  requireThat(branch !== repo.development && !(repo.release.kind === 'fixed' && branch === repo.release.name) && branch !== base, 'Task branch must differ from development/release branch');
+  requireThat(branch !== repo.development && !isReleaseBranch(branch, repo.release), 'Task branch must differ from development/release branch');
   const baseCommit = git(root, 'rev-parse', '--verify', `refs/heads/${base}^{commit}`);
   const wt = project.tools.worktrunk;
   let wtVersion: string | null = null;
@@ -100,7 +106,9 @@ export function planTask(project: Project, projectRoot: string, options: { targe
     base_observation: 'local branch only; no fetch performed; not proof of original branch creation',
     worktrunk: {version: wtVersion, config: wt.config ? localPath(projectRoot, wt.config) : null},
     manifests: target.manifests.map(id => project.manifests.find(m => m.id === id)),
-    graphify: {enabled: project.tools.graphify.enabled, procedure: project.tools.graphify.procedure, freshness: 'not assessed'},
+    graphify: project.tools.graphify.enabled
+      ? {enabled: true, procedure: project.tools.graphify.procedure, ...inspectGraph(worktree, null)}
+      : {enabled: false, installation: {status: 'not-inspected'}, graph: {status: 'not-inspected'}, freshness: {status: 'not-inspected'}},
     context: 'Selection only: native skill discovery and global tools must be checked before a new harness session',
   };
 }

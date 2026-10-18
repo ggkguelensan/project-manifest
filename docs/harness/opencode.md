@@ -9,3 +9,8 @@
 --pure исключает external plugins в диагностическом запуске; не считай это отключением встроенных возможностей и глобальных skills. Plugins, MCP и tools имеют отдельную конфигурацию. Не запускай непроверенный plugin как побочный эффект подключения документации.
 
 Воспроизведение discovery — `npm run test:native`. Полный prompt и выполнение skill не проверены. CLI вывод записывается в локальный файл: на проверенной версии pipe мог вернуть обрезанный JSON, поэтому тест не принимает неполный вывод за пустой каталог.
+
+
+`npm run test:opencode-permissions` отдельно проверяет реальное исполнение нативного `skill` tool через `opencode --pure debug agent build --tool skill --params '{"name":"probe-selected"}'`, без модельного запроса. На 1.18.4 положительный контроль загружает body второго fixture skill при allow; после изменения локального opencode.json на default deny + selected allow выбранный body загружается, а известный невыбранный skill получает permission refusal. Это проверка разрешения tool-call, не исполнение описанной в skill процедуры.
+
+Proof с CLI arguments, результатами и ограничениями сохраняется в `e2e/tmp/opencode-permissions-*/proof.json`. Тест изменяет только собственный fixture. Конфигурация конкретного агента может переопределять общий permission: проверяй фактический agent, а не только содержимое opencode.json. Полный prompt и скрытие metadata у denied skills остаются документированным поведением, которое этот probe напрямую не наблюдает.

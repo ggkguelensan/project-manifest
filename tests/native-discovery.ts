@@ -1,3 +1,4 @@
+import { inspectPi } from './helpers/pi-discovery.ts';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync, openSync, closeSync, readFileSync } from 'node:fs';
@@ -60,23 +61,6 @@ const openCode = targets.map((cwd, index) => {
   return { cwd, discovered: names, limitation: 'Discovery only; debug skill does not prove model-facing permission filtering.' };
 });
 writeFileSync(resolve(root, 'opencode-discovery.json'), JSON.stringify({ version: execFileSync('opencode', ['--version'], { encoding: 'utf8' }).trim(), checked: openCode }, null, 2));
-const piArgs = ['--offline', '--no-session', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--skill', resolve(root, 'sources/mobile'), '--mode', 'rpc', '--approve'];
-const pi = spawn('pi', piArgs, { cwd: targets[0], stdio: ['pipe', 'pipe', 'pipe'] }); pi.stderr.resume();
-const piLines = createInterface({ input: pi.stdout });
-try {
-  const response: any = await new Promise((done, reject) => {
-    const timer = setTimeout(() => reject(new Error('Pi command discovery timeout')), 30000);
-    pi.on('exit', code => { clearTimeout(timer); reject(new Error(`Pi exited ${code}`)); });
-    piLines.on('line', line => {
-      let data; try { data = JSON.parse(line); } catch { return; }
-      if (data.command !== 'get_commands') return;
-      clearTimeout(timer); done(data);
-    });
-    pi.stdin.write(JSON.stringify({ type: 'get_commands', id: 'probe' }) + '\n');
-  });
-  assert.equal(response.success, true);
-  const skills = response.data.commands.filter((c: any) => c.source === 'skill').map((c: any) => c.name);
-  assert.deepEqual(skills, ['skill:pm-probe-mobile']);
-  writeFileSync(resolve(root, 'pi-discovery.json'), JSON.stringify({ version: execFileSync('pi', ['--version'], { encoding: 'utf8' }).trim(), arguments: piArgs, response }, null, 2));
-  console.log(JSON.stringify({ root, opencode: 'sibling exclusion verified; inherited skills remain', pi: skills, model_calls: 0 }));
-} finally { pi.kill('SIGTERM'); piLines.close(); }
+const piResult = await inspectPi(targets[0], [{ name: 'pm-probe-mobile', path: resolve(root, 'sources/mobile') }]);
+writeFileSync(resolve(root, 'pi-discovery.json'), JSON.stringify(piResult, null, 2));
+console.log(JSON.stringify({ root, opencode: 'sibling exclusion verified; inherited skills remain', pi: piResult.skills, model_calls: 0 }));

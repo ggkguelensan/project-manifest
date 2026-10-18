@@ -6,6 +6,7 @@
 - Начать задачу: [start-project-task](skills/start-project-task/SKILL.md).
 - Понять модель, ветки и ограничения checkout: [project model](docs/project-model.md).
 - Подключить только выбранный контекст: [native harness context](docs/context.md).
+- Сохранить или восстановить локальную адаптацию: [workdir](docs/workdir.md).
 - Менять базу: [maintenance](docs/maintenance.md).
 
 Адаптация находится в игнорируемом `workdir/`, рабочие probes — в `e2e/tmp/`. Не меняй глобальные настройки и не публикуй локальные данные по умолчанию. Git — источник текущего состояния, локальные инструкции читаются из выбранного worktree.

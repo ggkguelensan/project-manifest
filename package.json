@@ -19,7 +19,8 @@
     "test:worktrunk": "node tests/worktrunk-integration.ts",
     "test:pi-cli-context": "node tests/pi-cli-context.ts",
     "test:claude-discovery": "node tests/claude-discovery.ts",
-    "test:codex-selection": "node tests/codex-selection.ts"
+    "test:codex-selection": "node tests/codex-selection.ts",
+    "test:opencode-permissions": "node tests/opencode-permissions.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

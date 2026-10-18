@@ -14,7 +14,8 @@
     "workdir": "node scripts/workdir.ts",
     "inspect:graph": "node scripts/graph.ts",
     "validate:connections": "node scripts/connections.ts",
-    "test:connections": "node tests/connections-integration.ts"
+    "test:connections": "node tests/connections-integration.ts",
+    "test:pi-context": "node tests/pi-context.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

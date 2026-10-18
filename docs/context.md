@@ -30,6 +30,6 @@ Project Manifest выбирает repository/target/worktree и подключё
 
 `npm run test:native` требует установленных Codex, Pi и OpenCode. Создаёт изолированный Git fixture с двумя target и symlink skills в e2e/tmp, вызывает Codex skills/list, OpenCode debug skill и Pi get_commands. Ни prompt, ни model turn не отправляется. Ничего не устанавливается в глобальные каталоги. Результаты сохраняются локально; точные версии выводятся на запуске.
 
-Проверка устанавливает принадлежность skills соседним targets и явный Pi allowlist. Она не доказывает полный системный prompt, выполнение skills, фильтрацию tool permissions или отсутствие всех глобальных расширений. Для Claude CLI здесь нет автоматической проверки discovery; версия и документированный механизм отмечены в его адаптере.
+Проверка устанавливает принадлежность skills соседним targets и явный Pi allowlist. Она не доказывает полный системный prompt, выполнение skills, фильтрацию tool permissions или отсутствие всех глобальных расширений. Для Claude CLI есть отдельный `npm run test:claude-discovery`: проверяет command inventory при initialize без модельного запроса; область и ограничения указаны в его адаптере.
 
 Для Pi дополнительно проверяется подготовленный system prompt и tool allowlist через SDK и фактический CLI session_start, без модели. Команды, отрицательный контроль SYSTEM.md и границы проверенного профиля описаны в [Pi](harness/pi.md). Это не доказательство исполнения skill или изоляции произвольных пользовательских настроек.

@@ -18,7 +18,8 @@
     "test:pi-context": "node tests/pi-context.ts",
     "test:worktrunk": "node tests/worktrunk-integration.ts",
     "test:pi-cli-context": "node tests/pi-cli-context.ts",
-    "test:claude-discovery": "node tests/claude-discovery.ts"
+    "test:claude-discovery": "node tests/claude-discovery.ts",
+    "test:codex-selection": "node tests/codex-selection.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

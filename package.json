@@ -16,7 +16,8 @@
     "validate:connections": "node scripts/connections.ts",
     "test:connections": "node tests/connections-integration.ts",
     "test:pi-context": "node tests/pi-context.ts",
-    "test:worktrunk": "node tests/worktrunk-integration.ts"
+    "test:worktrunk": "node tests/worktrunk-integration.ts",
+    "test:pi-cli-context": "node tests/pi-cli-context.ts"
   },
   "dependencies": {
     "ajv": "8.20.0",

@@ -15,3 +15,11 @@ Graphify: `enabled` означает выбор инструмента, не е�
 Подключения E2E/Design содержат локальный путь и точный commit. Их targets ссылаются на этот реестр, предметные настройки остаются у соответствующего манифеста. Нельзя копировать browser profiles, design snapshots или архитектурные нормы в Project Manifest. В самостоятельном E2E/Design режиме реестр target может быть локальным; при интеграции выбирается один владелец.
 
 Примеры требований, не общие defaults: Ticketon сохраняет GitLab namespace и раздельные source/deploy-config repositories; Korner запрещает изменять `korner-gh/`, создавая task worktrees из рабочих clones. FSD Korner и собственные правила Afisha не объединяются.
+
+## Проверка Worktrunk
+
+`npm run test:worktrunk` требует установленный `wt`. Проверено на 0.74.0: отдельный локальный проект, обязательный wt, workspace-конфигурация через `--config`, development и конкретная semver release-база с разными commits. Тест потребляет `path` из `wt switch --format json`, затем передаёт его `planTask`; шаблон пути не копируется в модель. Повторный switch после изменения шаблона сохраняет существующий worktree. Отсутствующая база не создаёт другой checkout; основной clone и неопределённый активный release отклоняются.
+
+В рабочей процедуре сначала прочитай применимые инструкции и конфигурацию. Для создания используй `wt --config <absolute-config> -C <working-clone> switch --create <task-branch> --base <chosen-base> --format json`; при config=null используй эффективную нативную конфигурацию без этого флага. Для существующего task worktree не добавляй `--create`. Полученный путь — вход проверки target, а не повод переключать основной checkout. Формат и параметры сверяй с установленной версией и [официальной документацией](https://worktrunk.dev/config/).
+
+Probe отключает hooks только в синтетическом fixture и не проверяет remote или lifecycle hooks. Его `worktrunk-verification.json` сохраняется в выбранном target/e2e/tmp, worktrees остаются для инспекции. Обычный `inspect` проверяет регистрацию Git и доступность обязательного wt; он не может ретроспективно доказать, какой командой создан произвольный worktree.

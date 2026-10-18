@@ -12,8 +12,11 @@ const validate = new Ajv2020({allErrors: true, strict: true}).compile(schema);
 function requireThat(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
 function unique(values: string[], label: string) { requireThat(new Set(values).size === values.length, `Duplicate ${label}`); }
 function within(root: string, path: string) { const rel = relative(root, path); return rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); }
-export function localPath(root: string, path: string) {
+function validateRelativePath(path: string) {
   requireThat(!isAbsolute(path) && !path.includes('\\') && !path.includes(':') && !path.split('/').includes('..'), `Invalid relative path: ${path}`);
+}
+export function localPath(root: string, path: string) {
+  validateRelativePath(path);
   const result = realpathSync(resolve(root, path));
   requireThat(within(realpathSync(root), result), `Path escapes selected root: ${path}`);
   return result;
@@ -40,9 +43,9 @@ export function readProject(file: string, projectRoot: string): Project {
   for (const target of project.targets) {
     const repository = project.repositories.find(repo => repo.id === target.repository_id);
     requireThat(repository, `Unknown repository: ${target.repository_id}`);
-    const repoRoot = localPath(projectRoot, repository.path);
-    const targetPath = localPath(repoRoot, target.path);
-    requireThat(statSync(targetPath).isDirectory() && gitRoot(targetPath) === repoRoot, `Target crosses repository boundary: ${target.id}`);
+    // Target existence and physical boundaries belong to the selected worktree.
+    // A task may introduce an application absent from the primary checkout.
+    validateRelativePath(target.path);
     for (const id of target.manifests) requireThat(project.manifests.some(m => m.id === id), `Unknown manifest: ${id}`);
   }
   for (const manifest of project.manifests) {

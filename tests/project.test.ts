@@ -72,3 +72,27 @@ test('manifest must match its pinned commit and have no local changes', () => fi
   data.manifests[0].revision = git('rev-parse', 'HEAD'); assert.ok(save());
   writeFileSync(resolve(root, 'repositories/frontend/apps/web/app.txt'), 'modified'); assert.throws(save, /local changes/);
 }));
+
+test('target introduced only in task worktree does not depend on main checkout layout', () => fixture((root, data, save) => {
+  const created = resolve(root, 'worktrees/task/apps/new-app');
+  mkdirSync(created, {recursive: true}); writeFileSync(resolve(created, 'app.txt'), 'new application');
+  data.targets.push({id: 'new-app', repository_id: 'frontend', path: 'apps/new-app', manifests: []});
+  // Another registered target may also be absent from this branch.
+  data.targets.push({id: 'future', repository_id: 'frontend', path: 'apps/future', manifests: []});
+  const project = save();
+  assert.equal(planTask(project, root, {...task, target: 'new-app'}).target_root, created);
+  assert.equal(planTask(project, root, task).target_id, 'web');
+  assert.throws(() => planTask(project, root, {...task, target: 'future'}), /ENOENT/);
+}));
+test('deferred target resolution still rejects traversal, symlink escape and nested repositories', () => fixture((root, data, save) => {
+  for (const path of ['../reference', '/tmp', 'apps/../web', 'apps\\web']) {
+    data.targets[0].path = path; assert.throws(save, /relative path|schema/);
+  }
+  data.targets[0].path = 'apps/escape';
+  symlinkSync(resolve(root, 'reference'), resolve(root, 'worktrees/task/apps/escape'));
+  assert.throws(() => planTask(save(), root, task), /escapes/);
+  const nested = resolve(root, 'worktrees/task/apps/nested'); mkdirSync(nested);
+  execFileSync('git', ['init', '-q', nested], {stdio: 'pipe'});
+  data.targets[0].path = 'apps/nested';
+  assert.throws(() => planTask(save(), root, task), /unavailable in selected worktree/);
+}));

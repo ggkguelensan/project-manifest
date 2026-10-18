@@ -26,6 +26,7 @@ test('select registered task worktree and nested target from current source', ()
   const plan = planTask(save(), root, task);
   assert.equal(plan.target_root, resolve(root, 'worktrees/task/apps/web'));
   assert.equal(plan.branch, 'task/example'); assert.equal(plan.local_changes, false);
+  assert.equal(plan.graphify.installation.status, 'not-inspected');
   writeFileSync(resolve(plan.target_root, 'app.txt'), 'modified');
   assert.equal(planTask(save(), root, task).local_changes, true);
 }));
@@ -58,6 +59,11 @@ test('foreign clone with same content is not a registered worktree', () => fixtu
 }));
 test('graphify enabled needs project procedure, required wt cannot be disabled', () => fixture((root, data, save) => {
   data.tools.graphify.enabled = true; assert.throws(save, /procedure/);
+  writeFileSync(resolve(root, 'graph-procedure.md'), 'Inspect current worktree sources before querying graph.');
+  data.tools.graphify.procedure = 'graph-procedure.md';
+  const selected = planTask(save(), root, task);
+  assert.equal(selected.graphify.graph.status, 'not-located');
+  assert.equal(selected.graphify.freshness.status, 'unknown');
   data.tools.graphify.enabled = false; data.tools.worktrunk.required_for_tasks = true; assert.throws(save, /Worktrunk/);
 }));
 test('manifest must match its pinned commit and have no local changes', () => fixture((root, data, save, git) => {

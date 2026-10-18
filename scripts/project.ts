@@ -1,3 +1,4 @@
+import { inspectGraph } from './graph.ts';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -100,7 +101,9 @@ export function planTask(project: Project, projectRoot: string, options: { targe
     base_observation: 'local branch only; no fetch performed; not proof of original branch creation',
     worktrunk: {version: wtVersion, config: wt.config ? localPath(projectRoot, wt.config) : null},
     manifests: target.manifests.map(id => project.manifests.find(m => m.id === id)),
-    graphify: {enabled: project.tools.graphify.enabled, procedure: project.tools.graphify.procedure, freshness: 'not assessed'},
+    graphify: project.tools.graphify.enabled
+      ? {enabled: true, procedure: project.tools.graphify.procedure, ...inspectGraph(worktree, null)}
+      : {enabled: false, installation: {status: 'not-inspected'}, graph: {status: 'not-inspected'}, freshness: {status: 'not-inspected'}},
     context: 'Selection only: native skill discovery and global tools must be checked before a new harness session',
   };
 }

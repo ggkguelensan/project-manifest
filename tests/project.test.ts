@@ -53,6 +53,17 @@ test('target must exist in chosen branch, not only in main clone', () => fixture
   rmSync(resolve(root, 'worktrees/task/apps/web'), {recursive: true});
   assert.throws(() => planTask(save(), root, task));
 }));
+test('release-family branches cannot serve as task branches for any purpose', () => fixture((root, data, save, git) => {
+  git('branch', 'release-1.0.0');
+  git('branch', '-m', 'task/example', 'release-2.0.0');
+  assert.throws(() => planTask(save(), root, task), /Task branch must differ/);
+  assert.throws(() => planTask(save(), root, {...task, purpose:'release', release:'release-1.0.0'}), /Task branch must differ/);
+  data.repositories[0].release = {kind:'date'};
+  git('branch', '-m', 'release-2.0.0', 'release-2026-10-18');
+  assert.throws(() => planTask(save(), root, task), /Task branch must differ/);
+  git('branch', '-m', 'release-2026-10-18', 'task/release-2026-10-18-fix');
+  assert.equal(planTask(save(), root, task).branch, 'task/release-2026-10-18-fix');
+}));
 test('foreign clone with same content is not a registered worktree', () => fixture((root, data, save) => {
   execFileSync('git', ['clone', resolve(root, 'repositories/frontend'), resolve(root, 'foreign')], {stdio: 'pipe'});
   assert.throws(() => planTask(save(), root, {...task, worktree: 'foreign'}), /another repository/);

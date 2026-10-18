@@ -24,6 +24,12 @@ export function localPath(root: string, path: string) {
 function git(root: string, ...args: string[]) { return execFileSync('git', ['--no-optional-locks', '-C', root, ...args], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim(); }
 function gitRoot(root: string) { return realpathSync(git(root, 'rev-parse', '--show-toplevel')); }
 function commonGit(root: string) { return realpathSync(git(root, 'rev-parse', '--path-format=absolute', '--git-common-dir')); }
+function isReleaseBranch(branch: string, policy: Repository['release']) {
+  if (policy.kind === 'fixed') return branch === policy.name;
+  if (policy.kind === 'semver') return /^release-(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(branch);
+  const date = branch.replace(/^release-/, '');
+  return /^release-\d{4}-\d{2}-\d{2}$/.test(branch) && !Number.isNaN(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
+}
 export function readProject(file: string, projectRoot: string): Project {
   const project: Project = JSON.parse(readFileSync(file, 'utf8'));
   requireThat(validate(project), `Project schema: ${JSON.stringify(validate.errors)}`);
@@ -82,14 +88,10 @@ export function planTask(project: Project, projectRoot: string, options: { targe
     else {
       requireThat(options.release, 'Select a concrete release branch; a family is not an active release');
       base = options.release;
-      if (repo.release.kind === 'semver') requireThat(/^release-(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(base), 'Expected release-<semver> (three numeric components)');
-      else {
-        const value = base.replace(/^release-/, '');
-        requireThat(/^release-\d{4}-\d{2}-\d{2}$/.test(base) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value, 'Expected valid release-YYYY-MM-DD');
-      }
+      requireThat(isReleaseBranch(base, repo.release), repo.release.kind === 'semver' ? 'Expected release-<semver> (three numeric components)' : 'Expected valid release-YYYY-MM-DD');
     }
   }
-  requireThat(branch !== repo.development && !(repo.release.kind === 'fixed' && branch === repo.release.name) && branch !== base, 'Task branch must differ from development/release branch');
+  requireThat(branch !== repo.development && !isReleaseBranch(branch, repo.release), 'Task branch must differ from development/release branch');
   const baseCommit = git(root, 'rev-parse', '--verify', `refs/heads/${base}^{commit}`);
   const wt = project.tools.worktrunk;
   let wtVersion: string | null = null;

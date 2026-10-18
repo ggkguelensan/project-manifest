@@ -1,3 +1,4 @@
+import { observePiCli } from './helpers/pi-cli-observation.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,21 +19,8 @@ writeFileSync(resolve(root, 'repository/AGENTS.md'), 'UNSELECTED_PARENT_RULE\n')
 writeFileSync(resolve(agentDir, 'skills/other/SKILL.md'), '---\nname: unselected-cli-probe\ndescription: UNSELECTED_SKILL_METADATA\n---\nUNSELECTED_BODY\n');
 const selected = resolve(root, 'selected');
 writeFileSync(resolve(selected, 'SKILL.md'), '---\nname: selected-cli-probe\ndescription: SELECTED_SKILL_METADATA\n---\nSELECTED_BODY_DEFERRED\n');
-const extension = resolve(root, 'observe.ts');
-writeFileSync(extension, `import { writeFileSync } from 'node:fs';
-export default function(pi) {
-  pi.on('session_start', async (_event, ctx) => {
-    writeFileSync(process.env.MANIFEST_PI_PROOF, JSON.stringify({ prompt: ctx.getSystemPrompt(), tools: pi.getActiveTools(), cwd: ctx.cwd }));
-    ctx.shutdown();
-  });
-}
-`);
-const common = ['--offline', '--no-session', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--skill', selected, '--tools', 'read', '--mode', 'rpc', '--approve', '--extension', extension];
-const run = (name: string, args: string[]) => {
-  const file = resolve(root, `${name}.json`);
-  execFileSync('pi', args, { cwd, input: '', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 30000, env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, MANIFEST_PI_PROOF: file } });
-  return JSON.parse(readFileSync(file, 'utf8'));
-};
+const common = ['--offline', '--no-session', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes', '--no-context-files', '--skill', selected, '--tools', 'read', '--mode', 'rpc', '--approve'];
+const run = (name: string, args: string[]) => observePiCli(cwd, args, agentDir, resolve(root, name));
 const uncontrolled = run('negative-control', common);
 assert.match(uncontrolled.prompt, /UNSELECTED_SYSTEM_OVERRIDE/);
 const args = [...common, '--system-prompt', '', '--append-system-prompt', entry];
